@@ -655,8 +655,8 @@ PAGES.images = () => `
   ${callout(
     "info",
     "How to add an image",
-    `Drop the file into the <code>images/</code> folder in the repository, add one line to <code>images/manifest.json</code>, then commit and push. GitHub Pages redeploys in about a minute and it appears here for everyone.`,
-    `Each manifest entry looks like <code>{ "file": "hero-v1.png", "caption": "First hero render, shoulders still too narrow" }</code>.`
+    `Drop the file into the <code>images/</code> folder in the repository, add an entry to <code>images/manifest.json</code>, then commit and push. GitHub Pages redeploys in about a minute and it appears here for everyone.`,
+    `Each entry looks like <code>{ "file": "hero-v1.png", "group": "Renders", "caption": "First hero render, shoulders still too narrow" }</code>. Images are grouped by the <code>group</code> field in the order the groups first appear. Click any image to open it full size.`
   )}
 
   <div id="gallery"><div class="empty">Loading images…</div></div>
@@ -714,14 +714,30 @@ async function loadGallery() {
     if (!res.ok) throw new Error("no manifest");
     const items = await res.json();
     if (!items.length) throw new Error("empty");
-    el.innerHTML = `<div class="gallery">${items
+
+    const groups = [];
+    for (const item of items) {
+      const name = item.group || "Ungrouped";
+      let g = groups.find((x) => x.name === name);
+      if (!g) groups.push((g = { name, items: [] }));
+      g.items.push(item);
+    }
+
+    el.innerHTML = groups
       .map(
-        (i) =>
-          `<figure class="shot"><img loading="lazy" src="images/${esc(i.file)}" alt="${esc(
-            i.caption || i.file
-          )}"><figcaption class="cap">${esc(i.caption || i.file)}</figcaption></figure>`
+        (g) => `<h3>${esc(g.name)}</h3><div class="gallery">${g.items
+          .map(
+            (i) =>
+              `<figure class="shot">
+                 <a href="images/${esc(i.file)}" target="_blank" rel="noopener">
+                   <img loading="lazy" src="images/${esc(i.file)}" alt="${esc(i.caption || i.file)}">
+                 </a>
+                 <figcaption class="cap">${esc(i.caption || i.file)}</figcaption>
+               </figure>`
+          )
+          .join("")}</div>`
       )
-      .join("")}</div>`;
+      .join("");
   } catch {
     el.innerHTML = `<div class="empty">No images yet. Add files to <code>images/</code> and list them in <code>images/manifest.json</code>.</div>`;
   }

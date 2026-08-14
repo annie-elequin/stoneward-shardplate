@@ -56,13 +56,23 @@ such as `SHARD`. Copy-to-clipboard works with or without this configured.
 
 ```json
 [
-  { "file": "hero-v1.png", "caption": "First hero render — shoulders still too narrow" }
+  {
+    "file": "hero-v1.png",
+    "group": "Renders",
+    "caption": "First hero render — shoulders still too narrow"
+  }
 ]
 ```
 
 3. Commit and push. Pages redeploys in about a minute.
 
-Keep files under ~2 MB each so the gallery stays quick on hotel wifi.
+Images are grouped by the `group` field, in the order the groups first appear in the file —
+`Inspiration`, `Renders`, `Work in progress` and so on. `group` is optional; entries without one
+fall under "Ungrouped". Clicking an image opens it full size.
+
+Keep files under ~2 MB each so the gallery stays quick on hotel wifi. Write captions that say what
+you were looking at rather than what the file is — "shoulders still too narrow, no shadow gap" is
+worth something in six months; "render 3" is not.
 
 ## Editing content
 
