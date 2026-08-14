@@ -8,9 +8,11 @@ const STORE_LINEAR_KEY = "shardplate.linearkey.v1";
 const Linear = {
   map: null, // linear-map.json, once fetched
   viewer: null, // { id, name } when a key is verified
+  issues: {}, // stepId -> { uuid, identifier }, learned on each pull
   remote: {}, // stepId -> true when the issue is in a completed state
   status: "off", // off | unseeded | error | ready
   error: "",
+  warning: "",
 };
 
 const linearKey = () => {
@@ -74,38 +76,54 @@ async function linearLoadMap() {
 const linearVerify = async () => (await linearGql(`query { viewer { id name } }`)).viewer;
 
 /* One query covers the whole build — 75 issues is well inside both the
-   250-node page and Linear's per-query complexity ceiling. */
+   250-node page and Linear's per-query complexity ceiling.
+
+   The map stores human-readable identifiers (CRE-42) because those are what
+   you can eyeball against Linear, but mutations need the UUID. Reading the
+   project hands back both, so each pull re-learns the UUIDs and the mapping
+   survives issues being moved or renamed. */
 async function linearPull() {
-  const ids = Object.values(Linear.map.steps);
   const data = await linearGql(
-    `query($ids:[ID!]) {
-      issues(filter: { id: { in: $ids } }, first: 250) {
-        nodes { id state { type } }
+    `query($project:String!) {
+      project(id: $project) {
+        issues(first: 250) {
+          nodes { id identifier state { type } }
+        }
       }
     }`,
-    { ids }
+    { project: Linear.map.project.id }
   );
 
-  const completed = new Set(
-    data.issues.nodes.filter((n) => n.state && n.state.type === "completed").map((n) => n.id)
-  );
+  const byIdentifier = {};
+  for (const n of data.project.issues.nodes) byIdentifier[n.identifier] = n;
+
+  Linear.issues = {};
   const remote = {};
-  for (const [stepId, issueId] of Object.entries(Linear.map.steps)) {
-    if (completed.has(issueId)) remote[stepId] = true;
+  for (const [stepId, identifier] of Object.entries(Linear.map.steps)) {
+    const node = byIdentifier[identifier];
+    if (!node) continue;
+    Linear.issues[stepId] = { uuid: node.id, identifier };
+    if (node.state && node.state.type === "completed") remote[stepId] = true;
   }
+
+  const found = Object.keys(Linear.issues).length;
+  const expected = Object.keys(Linear.map.steps).length;
+  if (found === 0) throw new Error("No mapped issues found in that Linear project");
+  if (found < expected) Linear.warning = `${expected - found} of ${expected} steps are missing from Linear`;
+
   return remote;
 }
 
 async function linearPush(stepId, done) {
-  const issueId = Linear.map && Linear.map.steps[stepId];
-  if (!issueId) throw new Error(`Step ${stepId} has no Linear issue mapped to it`);
+  const issue = Linear.issues[stepId];
+  if (!issue) throw new Error(`Step ${stepId} has no Linear issue mapped to it`);
 
   const stateId = done ? Linear.map.states.done : Linear.map.states.todo;
   const data = await linearGql(
     `mutation($id:String!, $stateId:String!) {
       issueUpdate(id: $id, input: { stateId: $stateId }) { success }
     }`,
-    { id: issueId, stateId }
+    { id: issue.uuid, stateId }
   );
   if (!data.issueUpdate || !data.issueUpdate.success) throw new Error("Linear did not accept the update");
 }
@@ -123,6 +141,7 @@ async function linearInit() {
     return;
   }
   try {
+    Linear.warning = "";
     Linear.viewer = await linearVerify();
     Linear.remote = await linearPull();
     Linear.status = "ready";

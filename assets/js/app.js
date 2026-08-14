@@ -214,6 +214,7 @@ function linearPanel() {
     <p>Signed in as <strong>${esc(Linear.viewer.name)}</strong>. Linear is the source of truth &mdash; these boxes show live issue states, and ticking one moves the issue to Done. ${done} of ${
     allStepIds().length
   } steps are complete there${projectLink}.</p>
+    ${Linear.warning ? `<p class="fine">${esc(Linear.warning)}, so those steps will not sync.</p>` : ""}
     <div class="toolbar" style="margin:12px 0 0">
       <button class="btn" data-act="linear-sync">Sync now</button>
       <button class="btn" data-act="linear-disconnect">Disconnect</button>
