@@ -622,15 +622,102 @@ const DATA = {
     },
   ],
 
+  assemblyUnits: [
+    {
+      id: `1 · Leg tower`,
+      holds: `Hip belt, suspenders over the shoulders, cuisses, hamstring lames, poleyns, greaves, crotch plate`,
+      how: `Step into it and buckle the hip belt onto the iliac crest, not the waist. Set suspender length so the straps are snug standing but never taut — they stop the belt migrating down, they do not lift the legs.`,
+      carries: `Hips`,
+      grams: 890,
+    },
+    {
+      id: `2 · Boots`,
+      holds: `Lift boots with sabatons already mounted to them`,
+      how: `Laced before anything closes over the ankle. This is the one ordering constraint in the whole suit that cannot be swapped.`,
+      carries: `Feet`,
+      grams: 380,
+    },
+    {
+      id: `3 · Torso unit`,
+      holds: `Cuirass front and back, integrated cantilever yoke, rib and lumbar lames, scale kilt hanging from the hem`,
+      how: `Drops over the head as one assembled piece and settles onto the yoke shelf. Two short waist couplers then clip down to the hip belt, which sheds load and stops the whole tower rocking as you walk.`,
+      carries: `Shoulders, part shed to hips`,
+      grams: 1165,
+    },
+    {
+      id: `4 · Arms`,
+      holds: `Rerebrace, couter and vambrace built as one sleeve per side`,
+      how: `Clips to a floating anchor on the yoke rail — a short webbing pivot, never a rigid bolt. The sleeve has to swing or you lose the shoulder.`,
+      carries: `Yoke`,
+      grams: 405,
+    },
+    {
+      id: `5 · Pauldrons`,
+      holds: `Cantilever lame stacks, one per side`,
+      how: `Clip onto the yoke rail, each lame clipping under the one above it. The stack closes over the arm clip so no hardware is visible from any angle.`,
+      carries: `Yoke`,
+      grams: 275,
+    },
+    {
+      id: `6 · Head and hands`,
+      holds: `Gorget ring, helm, gauntlets`,
+      how: `The gorget rings on last at the neck and covers the torso's head aperture. Glasses, then helm latched at the rear, then gauntlets.`,
+      carries: `Head, neck, hands`,
+      grams: 1052,
+    },
+    {
+      id: `Distributed`,
+      holds: `Flex-zone scale arrays, printed edge trim, crystal accretions`,
+      how: `Built into whichever unit they sit on, so they never don separately`,
+      carries: `Spread across all units`,
+      grams: 280,
+    },
+  ],
+
+  loadPath: [
+    [`Shoulders — torso, kilt, arms, pauldrons`, 1995],
+    [`Hips — leg tower through the belt`, 980],
+    [`Head and neck — helm and gorget`, 792],
+    [`Feet — sabatons and lift`, 380],
+    [`Hands — gauntlets`, 300],
+  ],
+
+  architectureRules: [
+    [
+      `Suspenders hold the belt up, they do not hold the legs up`,
+      `This is the difference between the architecture working and the architecture hurting. Slack under load, the straps stop the hip belt sliding and the legs stay on the iliac crest. Tensioned, you have quietly stacked 890 g of leg onto the same trapezius already carrying the torso, and hour six is where you find out.`,
+    ],
+    [
+      `The torso needs a head aperture, and the gorget is what hides it`,
+      `A one-piece torso going over the head has to clear a 22.5" skull, which is a wider neck opening than the silhouette wants. Build the aperture generously, then ring the gorget on afterwards to close it. This is why the gorget is its own unit rather than part of the cuirass.`,
+    ],
+    [
+      `Keep the front kilt panel unbonded at its sides`,
+      `Attaching the kilt to the cuirass is the right call structurally, but if it closes into a tube then every bathroom break becomes a full torso doff with a helper. Leave the front-center panel hanging free at both sides so it lifts like a curtain, and put a relief zipper in the undersuit under it.`,
+    ],
+    [
+      `Arms clip to a pivot, not a plate`,
+      `Rigidly clipping the arm sleeve to the yoke transfers the weight beautifully and costs you most of the shoulder's range. A short webbing pivot at the anchor keeps the transfer and gives the joint back.`,
+    ],
+    [
+      `Concealment creates a removal order — so build one bypass`,
+      `Pauldron over arm clip means the pauldron always comes off first, which makes the fast path out of the suit six steps deep and helper-dependent. Add one hidden side release on the cuirass that opens the torso for air without touching arms or pauldrons, and rehearse it on a timer.`,
+    ],
+    [
+      `Every unit is a bench assembly, not a don-time assembly`,
+      `Each of the six goes on as one object because it was already built as one object. Anything that gets screwed together while it is on your body is a design defect — it will be the thing that fails in the hallway.`,
+    ],
+  ],
+
   donning: [
     [`Base layer and undersuit with all sewn-in clusters`, `Solo`, `2 min`],
     [`Harness with batteries, PCM packs and bladder; power on, verify six zones`, `Solo`, `2 min`],
-    [`Lift boots, then waistbelt with fauld and cuisses`, `Solo`, `2 min`],
-    [`Greaves, poleyns, sabatons — legs first, while you can still bend`, `Solo`, `2 min`],
-    [`Back plate with yoke attached — shrug into it like a backpack`, `Helper`, `1 min`],
-    [`Front plate closed to the sides; bracket feet self-locate in their cups; gorget rings`, `Helper`, `2 min`],
-    [`Pauldron lames onto the yoke, then arms, pogo jumpers seating audibly`, `Helper`, `2 min`],
-    [`Glasses on, helm rear section opened and latched shut, then gauntlets`, `Helper`, `2 min`],
+    [`Unit 1 — leg tower: hip belt on the crest, suspenders set snug but slack`, `Solo`, `2 min`],
+    [`Unit 2 — lift boots laced, sabatons already mounted`, `Solo`, `2 min`],
+    [`Unit 3 — torso with kilt attached, over the head onto the yoke shelf; waist couplers to the belt`, `Helper`, `2 min`],
+    [`Unit 4 — arm sleeves onto the yoke pivots, pogo jumpers seating audibly`, `Helper`, `2 min`],
+    [`Unit 5 — pauldron stacks onto the yoke rail, closing over the arm clips`, `Helper`, `1 min`],
+    [`Unit 6 — gorget rings on, glasses, helm latched at the rear, then gauntlets`, `Helper`, `2 min`],
   ],
 
   failureOrder: [
@@ -658,6 +745,10 @@ const DATA = {
     [`Use nylon organza for the print-pause bond`, `It melts around 215 °C and fuses into a hole. Polyester crystal organza only, and prove the temperature on scrap first`, `organza`],
     [`Let the organza carry the kilt's weight`, `The print bond is strong in shear and mediocre in peel. The top row's roots go into a stitched grosgrain band that reaches the waistbelt`, `organza`],
     [`Print the hem and rear rows in PLA`, `That is the row that meets chairs, doorframes and stairs. PETG flexes and survives; PLA snaps and the break is sharp`, `organza`],
+    [`Tension the leg suspenders`, `They exist to stop the hip belt migrating down, not to lift the legs. Taut, they move 890 g of leg armor onto a trapezius already carrying the torso and the arms`, ``],
+    [`Close the scale kilt into a tube`, `A kilt bonded all the way around turns every bathroom break into a full torso doff with a helper. The front-center panel hangs free at both sides so it lifts like a curtain`, ``],
+    [`Bolt the arm sleeve rigidly to the yoke`, `The weight transfer is right and the joint is gone. Clip to a short webbing pivot so the sleeve can still swing`, ``],
+    [`Assemble any unit while it is on your body`, `Six objects, six motions. Anything screwed together at don time is the thing that comes apart in a hallway`, ``],
     [`Thread a fastener directly into foam, resin, or bare print`, `All three strip. A brass heat-set insert in a printed boss is the only serviceable thread in the build`, ``],
     [`Cast a crystal solid`, `Solid urethane triples the weight of every joint crown. Slush-cast hollow shells`, ``],
     [`Spray one topcoat over three unprimed substrates`, `Foam, PETG and resin absorb differently and the sheen mismatch shows under hall lighting even when the color matches`, ``],

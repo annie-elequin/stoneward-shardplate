@@ -423,6 +423,33 @@ PAGES.build = () => {
   <h2 class="page-title">Build order</h2>
   <p class="page-lede">Nine blocks over 64 weeks, plus 8 weeks of declared float. Check steps off as you go &mdash; progress is saved in this browser, so each person tracking their own copy gets their own state.</p>
 
+  <h3>Assembly architecture &mdash; the six units</h3>
+  <p>Everything on this page exists to produce six objects. The suit is not a hundred parts you attach to yourself; it is six assemblies that each go on in one motion, in a fixed order, and each one lands its weight somewhere deliberate. Read this before the blocks &mdash; it is the reason the blocks are sequenced the way they are.</p>
+
+  ${table(
+    ["Unit", "What's in it", "How it goes on", "Weight lands on", "g"],
+    DATA.assemblyUnits.map((u) => [u.id, u.holds, u.how, u.carries, u.grams.toLocaleString()]),
+    { align: ["", "", "", "", "num"] }
+  )}
+
+  ${callout(
+    "good",
+    "The load path checks out",
+    `Legs suspend from the hip belt, the torso and everything clipped to it rests on the yoke, and the head carries only the helm. Run the numbers against that split and it lands at <strong>4.4 lb on the shoulders, 2.2 lb on the hips, 1.7 lb on the head and neck</strong>, with the rest on feet and hands. That shoulder figure is a light day pack, and it is the number that decides whether hour eleven is fine or miserable.`,
+    `The single thing that breaks it is tensioning the leg suspenders. Do that and the 2.2 lb on your hips migrates onto the same trapezius already carrying 4.4 lb, and you have built a 6.6 lb yoke load with no way to shed it without undressing.`
+  )}
+
+  ${barChart(DATA.loadPath, " g")}
+
+  <h3>Six rules that fall out of this architecture</h3>
+  ${table(["Rule", "Why"], DATA.architectureRules)}
+
+  ${note(
+    "Attaching the kilt to the cuirass is a good structural call &mdash; it puts the fauld's 460 g onto the yoke shelf instead of dragging on a separate belt, and it kills the gap between cuirass hem and kilt top that is otherwise the hardest seam in the suit to hide. It just has to stay a curtain rather than becoming a tube."
+  )}
+
+  <h3>The blocks</h3>
+
   <div class="overall">
     <div class="top"><strong>Overall progress</strong><span id="ov-frac">${done} of ${total} steps · ${Math.round(
     (done / total) * 100
@@ -561,7 +588,7 @@ PAGES.logistics = () => `
   <h3>Donning sequence &mdash; 15 minutes, one helper</h3>
   ${table(["Step", "Who", "Time"], DATA.donning, { align: ["", "", "num"] })}
   ${note(
-    "Legs first, while you can still bend. The back plate carries the yoke, so you shrug into it like a backpack and the front closes to it at the sides."
+    'Legs first, while you can still bend, and boots before anything closes over the ankle. From there it is one unit per step &mdash; see <a href="#/build">the six units</a> on the build page for what each one contains and where its weight goes.'
   )}
 
   <h3>Texas heat protocol</h3>
