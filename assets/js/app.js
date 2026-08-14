@@ -126,10 +126,29 @@ let progress = load(STORE_PROGRESS, {});
 
 const allStepIds = () => DATA.phases.flatMap((p) => p.steps.map((s) => s[0]));
 
-function setStep(id, done) {
+/* Optimistic: the box moves immediately, then Linear is told. If Linear
+   refuses, both the box and the local cache roll back to where they were. */
+async function setStep(id, done, box) {
+  const prev = !!progress[id];
   if (done) progress[id] = true;
   else delete progress[id];
   save(STORE_PROGRESS, progress);
+  refreshProgressUI();
+
+  if (!linearConnected()) return;
+
+  try {
+    await linearPush(id, done);
+    if (done) Linear.remote[id] = true;
+    else delete Linear.remote[id];
+  } catch (err) {
+    if (prev) progress[id] = true;
+    else delete progress[id];
+    save(STORE_PROGRESS, progress);
+    if (box) box.checked = prev;
+    refreshProgressUI();
+    toast(err.message);
+  }
 }
 
 function phaseStats(phase) {
@@ -158,6 +177,60 @@ function sendToLinear(title, description) {
   const url = linearUrl(title, description);
   copy(linearIssueText(title, description), url ? "Copied — opening Linear" : "Copied for Linear");
   if (url) window.open(url, "_blank", "noopener");
+}
+
+function linearPanel() {
+  const projectLink =
+    Linear.map && Linear.map.project && Linear.map.project.url
+      ? ` &middot; <a href="${esc(Linear.map.project.url)}" target="_blank" rel="noopener">open the project in Linear</a>`
+      : "";
+
+  if (Linear.status === "unseeded")
+    return `<div class="callout warn"><h4>Linear sync is not set up yet</h4>
+      <p>The build steps have not been created as Linear issues, so checkboxes are saved in this browser only &mdash; nobody else sees them. Once the issues exist and <code>assets/js/linear-map.json</code> is committed, this panel turns into a connect box.</p></div>`;
+
+  if (Linear.status === "off")
+    return `<div class="callout info"><h4>Connect Linear to share progress</h4>
+      <p>Right now these checkboxes live in this browser only. Paste a Linear personal API key and every box becomes the real state of a Linear issue &mdash; so you and the crew all see the same progress from any device.</p>
+      <div class="keyrow">
+        <input type="password" id="lk" placeholder="lin_api_..." autocomplete="off" spellcheck="false" aria-label="Linear API key">
+        <button class="btn primary" data-act="linear-connect">Connect</button>
+      </div>
+      <p class="fine">Create one at <a href="https://linear.app/settings/api" target="_blank" rel="noopener">linear.app/settings/api</a>. The key is stored only in your own browser and is never sent anywhere except Linear. It carries your full Linear access, so use your own rather than sharing one.${projectLink}</p>
+    </div>`;
+
+  if (Linear.status === "error")
+    return `<div class="callout bad"><h4>Linear is not responding</h4>
+      <p>${esc(Linear.error)}</p>
+      <p>Checkboxes are falling back to this browser only, so anything you tick now will not reach Linear until this is fixed.</p>
+      <div class="toolbar" style="margin:12px 0 0">
+        <button class="btn" data-act="linear-sync">Retry</button>
+        <button class="btn" data-act="linear-disconnect">Remove key</button>
+      </div>
+    </div>`;
+
+  const done = Object.keys(Linear.remote).length;
+  return `<div class="callout good"><h4>Synced with Linear</h4>
+    <p>Signed in as <strong>${esc(Linear.viewer.name)}</strong>. Linear is the source of truth &mdash; these boxes show live issue states, and ticking one moves the issue to Done. ${done} of ${
+    allStepIds().length
+  } steps are complete there${projectLink}.</p>
+    <div class="toolbar" style="margin:12px 0 0">
+      <button class="btn" data-act="linear-sync">Sync now</button>
+      <button class="btn" data-act="linear-disconnect">Disconnect</button>
+    </div>
+  </div>`;
+}
+
+async function linearRefresh(msg) {
+  await linearInit();
+  if (linearConnected()) {
+    progress = { ...Linear.remote };
+    save(STORE_PROGRESS, progress);
+  }
+  const y = window.scrollY;
+  route();
+  window.scrollTo(0, y);
+  if (msg) toast(msg);
 }
 
 /* ------------------------------------------------------------------ pages */
@@ -450,6 +523,8 @@ PAGES.build = () => {
 
   <h3>The blocks</h3>
 
+  ${linearPanel()}
+
   <div class="overall">
     <div class="top"><strong>Overall progress</strong><span id="ov-frac">${done} of ${total} steps · ${Math.round(
     (done / total) * 100
@@ -588,7 +663,7 @@ PAGES.logistics = () => `
   <h3>Donning sequence &mdash; 15 minutes, one helper</h3>
   ${table(["Step", "Who", "Time"], DATA.donning, { align: ["", "", "num"] })}
   ${note(
-    'Legs first, while you can still bend, and boots before anything closes over the ankle. From there it is one unit per step &mdash; see <a href="#/build">the six units</a> on the build page for what each one contains and where its weight goes.'
+    'Legs first, while you can still bend, and boots before anything closes over the ankle. From there it is one unit per step &mdash; see <a href="#build">the six units</a> on the build page for what each one contains and where its weight goes.'
   )}
 
   <h3>Texas heat protocol</h3>
@@ -786,8 +861,9 @@ function route() {
 }
 
 const footerHtml = () =>
-  `<footer>Stoneward Shardplate build bible · progress is stored in this browser only ·
-   <a href="#build">build order</a> · <a href="#donot">do not</a></footer>`;
+  `<footer>Stoneward Shardplate build bible · ${
+    linearConnected() ? "progress synced with Linear" : "progress stored in this browser only"
+  } · <a href="#build">build order</a> · <a href="#donot">do not</a></footer>`;
 
 /* ---------------------------------------------------------------- wiring */
 
@@ -817,10 +893,7 @@ function wireBuild() {
   );
 
   $$('input[data-step]').forEach((cb) =>
-    cb.addEventListener("change", () => {
-      setStep(cb.dataset.step, cb.checked);
-      refreshProgressUI();
-    })
+    cb.addEventListener("change", () => setStep(cb.dataset.step, cb.checked, cb))
   );
 
   $$("[data-linear]").forEach((b) =>
@@ -874,11 +947,31 @@ function wireBuild() {
       inp.click();
     },
     reset: () => {
+      if (linearConnected()) {
+        toast("Linear is the source of truth — reopen the issues there instead");
+        return;
+      }
       if (!confirm("Clear all checked steps in this browser?")) return;
       progress = {};
       save(STORE_PROGRESS, progress);
       route();
       toast("Progress cleared");
+    },
+    "linear-connect": async () => {
+      const key = ($("#lk").value || "").trim();
+      if (!key) return toast("Paste a Linear API key first");
+      setLinearKey(key);
+      toast("Checking that key…");
+      await linearRefresh();
+      if (!linearConnected()) setLinearKey("");
+      else toast("Connected — progress now comes from Linear");
+    },
+    "linear-sync": () => linearRefresh("Synced with Linear"),
+    "linear-disconnect": async () => {
+      setLinearKey("");
+      Linear.viewer = null;
+      Linear.remote = {};
+      await linearRefresh("Key removed — tracking locally again");
     },
   };
   $$("[data-act]").forEach((b) => b.addEventListener("click", () => acts[b.dataset.act]()));
@@ -923,6 +1016,20 @@ function boot() {
 
   window.addEventListener("hashchange", route);
   route();
+
+  /* Paint from cache first, then reconcile with Linear — a slow or failing
+     API call must never leave the page blank. */
+  linearInit().then(() => {
+    if (linearConnected()) {
+      progress = { ...Linear.remote };
+      save(STORE_PROGRESS, progress);
+    }
+    if (Linear.status !== "off") {
+      const y = window.scrollY;
+      route();
+      window.scrollTo(0, y);
+    }
+  });
 }
 
 document.addEventListener("DOMContentLoaded", boot);
