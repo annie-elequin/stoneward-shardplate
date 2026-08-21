@@ -559,7 +559,7 @@ PAGES.procurement = () => {
         <span class="caret">▶</span>
         <div class="phase-title">
           <h4>Block ${b.block} — ${esc(b.weeks)}</h4>
-          <span class="weeks">${b.items.length} items · buy before week ${b.weekStart}</span>
+          <span class="weeks">${b.items.length} items · ${esc(b.weeks)}</span>
         </div>
       </div>
       <div class="phase-body">
