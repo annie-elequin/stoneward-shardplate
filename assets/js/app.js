@@ -120,6 +120,70 @@ function kv(pairs) {
     .join("")}</div>`;
 }
 
+/* ---------------------------------------------------------- procurement */
+
+const shopByName = () => {
+  const map = new Map();
+  for (const row of DATA.shopping) map.set(row[0], row);
+  return map;
+};
+
+function blocksForWeek(week) {
+  return DATA.procurementByBlock.filter((b) => week >= b.weekStart && week <= b.weekEnd);
+}
+
+function procurementItemsForWeek(week) {
+  const seen = new Set();
+  const rows = [];
+  for (const block of blocksForWeek(week)) {
+    for (const name of block.items) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const shop = shopByName().get(name);
+      rows.push({
+        name,
+        qty: shop ? shop[1] : "—",
+        usd: shop ? shop[2] : 0,
+        block: block.block,
+        missing: !shop,
+      });
+    }
+  }
+  return rows.sort((a, b) => a.block - b.block || a.name.localeCompare(b.name));
+}
+
+function procurementSpendThroughWeek(week) {
+  let total = 0;
+  const seen = new Set();
+  for (const block of DATA.procurementByBlock) {
+    if (block.weekStart > week) continue;
+    for (const name of block.items) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const shop = shopByName().get(name);
+      if (shop) total += shop[2];
+    }
+  }
+  return total;
+}
+
+function weekCalendarDate(week, startIso) {
+  if (!startIso) return null;
+  const start = new Date(startIso + "T12:00:00");
+  if (Number.isNaN(start.getTime())) return null;
+  const d = new Date(start);
+  d.setDate(d.getDate() + (week - 1) * 7);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function loadBuilder() {
+  return load(STORE_BUILDER, { startDate: "", week: 1, view: "week" });
+}
+
+function saveBuilder(cfg) {
+  save(STORE_BUILDER, cfg);
+}
+
 /* --------------------------------------------------------------- progress */
 
 let progress = load(STORE_PROGRESS, {});
@@ -463,6 +527,137 @@ PAGES.materials = () => {
 `;
 };
 
+PAGES.procurement = () => {
+  const cfg = loadBuilder();
+  const week = Math.min(72, Math.max(1, cfg.week || 1));
+  const blocks = blocksForWeek(week);
+  const items = procurementItemsForWeek(week);
+  const weekSpend = items.reduce((s, r) => s + r.usd, 0);
+  const cumulative = procurementSpendThroughWeek(week);
+  const shopTotal = DATA.shopping.reduce((s, r) => s + r[2], 0);
+  const cal = weekCalendarDate(week, cfg.startDate);
+  const blockLabel =
+    blocks.length === 0
+      ? "Outside the build calendar"
+      : blocks.map((b) => `Block ${b.block}`).join(" + ");
+
+  const blockOverview = DATA.procurementByBlock.map((b) => {
+    const blockItems = b.items
+      .map((name) => {
+        const shop = shopByName().get(name);
+        return shop ? [name, shop[1], `$${shop[2]}`] : [name, "—", "—"];
+      })
+      .concat([
+        [
+          "Block subtotal",
+          "",
+          `$${b.items.reduce((s, name) => s + (shopByName().get(name)?.[2] || 0), 0)}`,
+        ],
+      ]);
+    return `<div class="phase${b.block === (blocks[0]?.block || 0) ? " open" : ""}" data-proc-block="${b.block}">
+      <div class="phase-head">
+        <span class="caret">▶</span>
+        <div class="phase-title">
+          <h4>Block ${b.block} — ${esc(b.weeks)}</h4>
+          <span class="weeks">${b.items.length} items · buy before week ${b.weekStart}</span>
+        </div>
+      </div>
+      <div class="phase-body">
+        <p class="phase-note">${esc(b.note)}</p>
+        ${table(["Item", "Quantity", "Estimate"], blockItems, {
+          align: ["", "", "num"],
+          totalRow: blockItems.length - 1,
+        })}
+      </div>
+    </div>`;
+  }).join("");
+
+  const itemRows = items.map((r) => [
+    r.name,
+    r.qty,
+    r.usd ? `$${r.usd}` : "—",
+    `Block ${r.block}`,
+  ]);
+  if (itemRows.length) {
+    itemRows.push(["This week", "", `$${weekSpend}`, ""]);
+  }
+
+  const spendByBlock = DATA.procurementByBlock.map((b) => [
+    `Block ${b.block} (${b.weeks})`,
+    b.items.reduce((s, name) => s + (shopByName().get(name)?.[2] || 0), 0),
+  ]);
+
+  return `
+  <h2 class="page-title">Weekly materials</h2>
+  <p class="page-lede">What to buy and when — mapped to the nine build blocks. Pick a week to see that block's shopping list, cumulative spend, and optional calendar dates if you set a start date.</p>
+
+  ${statRow([
+    { value: `Week ${week}`, label: blockLabel, tone: blocks.length ? "info" : "" },
+    { value: `$${weekSpend.toLocaleString()}`, label: "Active block materials", tone: weekSpend ? "warn" : "" },
+    { value: `$${cumulative.toLocaleString()}`, label: "Cumulative through this week", tone: "" },
+    { value: `$${shopTotal.toLocaleString()}`, label: "Full project total", tone: "good" },
+  ])}
+
+  ${callout(
+    "info",
+    "How to read this page",
+    `Items appear in the week their block <em>starts</em>, so you have stock on hand before the steps that need it. Blocks 4 and 5 overlap (weeks 27–34), so those weeks show a merged list from both blocks.`,
+    `Some materials appear in more than one block when trials and production are separate buys — organza and PETG in Block 3 for scorch trials, then again in Block 6 for the production run. The cumulative total counts each shopping-line item once.`
+  )}
+
+  <h3>Week selector</h3>
+  <div class="proc-controls">
+    <div class="proc-row">
+      <label for="proc-week">Build week</label>
+      <input type="range" id="proc-week" min="1" max="72" value="${week}">
+      <output id="proc-week-out" for="proc-week">Week ${week}${cal ? ` · ~${cal}` : ""}</output>
+    </div>
+    <div class="proc-row">
+      <label for="proc-start">Start date <span class="fine">(optional)</span></label>
+      <input type="date" id="proc-start" value="${esc(cfg.startDate || "")}">
+      <button class="btn" data-proc-act="clear-date">Clear</button>
+    </div>
+    <div class="proc-row proc-actions">
+      <button class="btn" data-proc-act="prev">← Prev week</button>
+      <button class="btn" data-proc-act="next">Next week →</button>
+      <span class="grow"></span>
+      <button class="btn ${cfg.view === "week" ? "primary" : ""}" data-proc-view="week">By week</button>
+      <button class="btn ${cfg.view === "blocks" ? "primary" : ""}" data-proc-view="blocks">All blocks</button>
+    </div>
+  </div>
+
+  ${
+    cfg.view === "blocks"
+      ? `<h3>Procurement by block</h3>
+         <p class="note">Full schedule — buy everything in a block before its first week. See also the flat list on <a href="#materials">Materials</a> and the build steps on <a href="#build">Build order</a>.</p>
+         ${blockOverview}`
+      : `<h3>Week ${week}${cal ? ` · ${esc(cal)}` : ""}</h3>
+         ${
+           blocks.length
+             ? `<p class="note">${blocks
+                 .map((b) => `<strong>${esc(b.weeks)}</strong> — ${esc(b.note)}`)
+                 .join("<br>")}</p>`
+             : `<p class="note">Week ${week} is outside the 72-week build calendar (64 weeks plus 8 float).</p>`
+         }
+         ${
+           itemRows.length
+             ? table(["Item", "Quantity", "Estimate", "Block"], itemRows, {
+                 align: ["", "", "num", ""],
+                 totalRow: itemRows.length - 1,
+                 rowClass: items.map((r) => (r.missing ? "bad" : "")),
+               })
+             : `<div class="empty">No procurement items scheduled for this week.</div>`
+         }`
+  }
+
+  <h3>Spend by block</h3>
+  ${barChart(spendByBlock, "")}
+  ${note(
+    `Thermal hardening, cooling, and the fog module are included in the block totals above. Cumulative through week ${week}: <strong>$${cumulative.toLocaleString()}</strong> of <strong>$${shopTotal.toLocaleString()}</strong> total.`
+  )}
+`;
+};
+
 PAGES.joinery = () => `
   <h2 class="page-title">Joinery</h2>
   <p class="page-lede">How every class of part attaches to every other class. Fourteen interfaces, each with a spec and an explicit never. If a helper is unsure how something attaches, the answer is on this page.</p>
@@ -777,6 +972,7 @@ const NAV = [
   ]],
   ["Making it", [
     ["materials", "E", "Materials"],
+    ["procurement", "E3", "Weekly materials"],
     ["joinery", "E2", "Joinery"],
     ["build", "G", "Build order"],
     ["crew", "G2", "Crew"],
@@ -858,13 +1054,14 @@ function route() {
   $(".scrim").classList.remove("show");
   if (page === "images") loadGallery();
   if (page === "build") wireBuild();
+  if (page === "procurement") wireProcurement();
   if (page === "renders") wireRenders();
 }
 
 const footerHtml = () =>
   `<footer>Stoneward Shardplate build bible · ${
     linearConnected() ? "progress synced with Linear" : "progress stored in this browser only"
-  } · <a href="#build">build order</a> · <a href="#donot">do not</a></footer>`;
+  } · <a href="#procurement">weekly materials</a> · <a href="#build">build order</a> · <a href="#donot">do not</a></footer>`;
 
 /* ---------------------------------------------------------------- wiring */
 
@@ -986,6 +1183,55 @@ function wireRenders() {
       const text = id === "style" ? body : `${body}\n\n${DATA.renderStyleBlock}`;
       copy(text, id === "style" ? "Style block copied" : "Prompt copied, style block included");
     })
+  );
+}
+
+function wireProcurement() {
+  const cfg = loadBuilder();
+  const rerender = (patch) => {
+    saveBuilder({ ...loadBuilder(), ...patch });
+    const y = window.scrollY;
+    route();
+    window.scrollTo(0, y);
+  };
+
+  $$(".phase-head", $("#main")).forEach((h) =>
+    h.addEventListener("click", (e) => {
+      if (e.target.closest("button")) return;
+      h.parentElement.classList.toggle("open");
+    })
+  );
+
+  const weekInput = $("#proc-week");
+  const weekOut = $("#proc-week-out");
+  if (weekInput) {
+    const syncOut = () => {
+      const w = +weekInput.value;
+      const cal = weekCalendarDate(w, ($("#proc-start")?.value || cfg.startDate || "").trim());
+      weekOut.textContent = `Week ${w}${cal ? ` · ~${cal}` : ""}`;
+    };
+    weekInput.addEventListener("input", syncOut);
+    weekInput.addEventListener("change", () => rerender({ week: +weekInput.value }));
+    syncOut();
+  }
+
+  const startInput = $("#proc-start");
+  if (startInput) {
+    startInput.addEventListener("change", () => rerender({ startDate: startInput.value }));
+  }
+
+  $$("[data-proc-act]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const cur = loadBuilder();
+      const w = cur.week || 1;
+      if (b.dataset.procAct === "prev") rerender({ week: Math.max(1, w - 1) });
+      if (b.dataset.procAct === "next") rerender({ week: Math.min(72, w + 1) });
+      if (b.dataset.procAct === "clear-date") rerender({ startDate: "" });
+    })
+  );
+
+  $$("[data-proc-view]").forEach((b) =>
+    b.addEventListener("click", () => rerender({ view: b.dataset.procView }))
   );
 }
 

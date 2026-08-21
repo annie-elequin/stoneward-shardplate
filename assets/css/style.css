@@ -297,6 +297,34 @@ tr.total td { background: var(--stone-800); font-weight: 640; color: var(--stone
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 20px; }
 .toolbar .grow { flex: 1; }
 
+.proc-controls {
+  background: var(--stone-850); border: 1px solid var(--stone-700);
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 24px;
+}
+.proc-row {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.proc-row:last-child { margin-bottom: 0; }
+.proc-row label {
+  min-width: 110px; font-size: 13px; color: var(--stone-300); font-weight: 550;
+}
+.proc-row label .fine { font-weight: 400; color: var(--stone-500); }
+.proc-row input[type="range"] {
+  flex: 1; min-width: 160px; accent-color: var(--topaz);
+}
+.proc-row input[type="date"] {
+  background: var(--stone-900); color: var(--stone-200);
+  border: 1px solid var(--stone-600); border-radius: 6px;
+  padding: 6px 10px; font-family: var(--font); font-size: 13px;
+}
+.proc-row input[type="date"]:focus { outline: none; border-color: var(--topaz-dim); }
+.proc-row output {
+  font-family: var(--mono); font-size: 12.5px; color: var(--topaz-bright);
+  min-width: 180px;
+}
+.proc-actions { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--stone-800); }
+
 .overall {
   background: var(--stone-850); border: 1px solid var(--stone-700);
   border-radius: var(--radius); padding: 15px 18px; margin-bottom: 18px;
